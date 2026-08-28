@@ -63,7 +63,7 @@ taken, so they are reported separately and added in quadrature:
 
 The band is calibrated as a true one-sigma: against synthetic Moons of known
 phase the truth lands inside it in **114 of 123** cases (93%), median error
-0.17σ, nothing beyond 2σ. One real-world point too: a photo taken 5½ hours
+0.17σ, worst case right at 2σ. One real-world point too: a photo taken 5½ hours
 before the August 2026 full moon (true illumination 99.94%) measured 98.45% —
 0.6σ against the quoted band. Nine further images were **declined**
 rather than measured: a crescent thinner than the blur hiding it still leaves a
