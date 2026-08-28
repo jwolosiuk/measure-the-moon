@@ -18,6 +18,12 @@ const cam = $('cam');
 
 let liveTimer = null;
 let stream = null;
+// Bumped whenever the user picks a source. getUserMedia does not resolve until
+// the permission prompt is answered, and the user can start the demo while it
+// is open -- at which point `stream` is still null, so stopCamera() has nothing
+// to stop and the camera would quietly take the page over afterwards, showing
+// live frames captioned with the demo's truth value.
+let session = 0;
 let lastResult = null;
 let lastSource = null;   // { el, w, h }
 let demoTruth = null;    // known lit fraction when the demo is driving
@@ -139,22 +145,32 @@ function showResult(r) {
 
 async function startCamera() {
 	stopDemo();
+	const token = ++session;
 	if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
 		showFailure('This browser will not give a web page camera access. Open a photo instead.');
 		return;
 	}
+	let opened;
 	try {
-		stream = await navigator.mediaDevices.getUserMedia({
+		opened = await navigator.mediaDevices.getUserMedia({
 			video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
 			audio: false,
 		});
 	} catch (err) {
+		if (token !== session) return; // the user moved on while the prompt was open
 		const msg = err && err.name === 'NotAllowedError'
 			? 'Camera permission was refused. You can still open a photo, or try the demo.'
 			: `Could not open the camera (${err && err.name ? err.name : 'unknown error'}). Opening a photo works just as well — usually better, since phone cameras overexpose the Moon.`;
 		showFailure(msg);
 		return;
 	}
+	if (token !== session) {
+		// Answered late: hand the camera straight back rather than hijacking
+		// whatever the user is looking at now.
+		opened.getTracks().forEach((t) => t.stop());
+		return;
+	}
+	stream = opened;
 	cam.srcObject = stream;
 	await cam.play().catch(() => {});
 	$('livebadge').hidden = false;
@@ -193,6 +209,7 @@ function stopDemo() {
 
 function runDemo() {
 	stopCamera();
+	session++;
 	$('demo-panel').hidden = false;
 	const k = $('demo-phase').valueAsNumber / 1000;
 	const blur = $('demo-blur').valueAsNumber / 10;
@@ -227,6 +244,7 @@ $('file').addEventListener('change', (e) => {
 	if (!f) return;
 	stopCamera();
 	stopDemo();
+	session++;
 	const img = new Image();
 	img.onload = () => { measure(img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(img.src); };
 	img.onerror = () => showFailure('That file could not be read as an image.');

@@ -88,4 +88,31 @@ $('btn-cam').dispatchEvent(new dom.window.Event('click'));
 await new Promise((r) => setTimeout(r, 50));
 assert.ok(/camera|photo/i.test($('warnings').textContent), 'should explain the missing camera');
 
-console.log('smoke: ok');
+
+
+// --- a camera answered late must not hijack what the user moved on to --------
+{
+	let release;
+	const tracks = [{ stopped: false, stop() { this.stopped = true; } }];
+	Object.defineProperty(dom.window.navigator, 'mediaDevices', {
+		value: { getUserMedia: () => new Promise((r) => { release = r; }) },
+		configurable: true,
+	});
+
+	$('btn-cam').dispatchEvent(new dom.window.Event('click'));   // permission prompt opens
+	$('demo-phase').value = '900';
+	$('btn-demo').dispatchEvent(new dom.window.Event('click'));  // user starts the demo meanwhile
+
+	const during = $('k-value').textContent;
+	assert.match($('k-truth').textContent, /Demo truth 90/);
+
+	release({ getTracks: () => tracks });                        // permission granted, late
+	await new Promise((r) => setTimeout(r, 60));
+
+	assert.equal($('k-value').textContent, during, 'late camera clobbered the demo reading');
+	assert.ok(tracks[0].stopped, 'the abandoned camera stream was left running');
+	assert.ok($('livebadge').hidden, 'went live behind the user');
+	assert.match($('k-truth').textContent, /Demo truth 90/, 'demo truth left captioning other pixels');
+}
+
+console.log('smoke: ok (incl. late-camera race)');
