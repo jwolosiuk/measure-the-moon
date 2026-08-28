@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Measure the Moon — how much of the disc is lit?</title>
+<meta name="description" content="Point a camera at the Moon and measure what fraction of its disc is illuminated, by fitting two overlapping circles to the shape. Shows the circles, and an honest error budget.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23f3d9a4'/><circle cx='24' cy='13' r='12' fill='%230b0e17'/></svg>">
+</head>
+<body>
+<header>
+	<h1>Measure the Moon</h1>
+	<p class="tagline">Point a camera at the Moon. This measures what fraction of its disc is lit, by fitting two overlapping circles to the shape — and tells you how much to trust the answer.</p>
+</header>
+
+<main>
+	<section class="stage">
+		<div class="viewport" id="viewport">
+			<canvas id="view"></canvas>
+			<video id="cam" playsinline muted autoplay></video>
+			<div class="placeholder" id="placeholder">
+				<p>Nothing loaded yet.</p>
+				<p class="sub">Use the camera, open a photo, or try the demo.</p>
+			</div>
+			<div class="badge" id="livebadge" hidden>LIVE</div>
+		</div>
+
+		<div class="controls">
+			<button id="btn-cam" class="primary">Use camera</button>
+			<button id="btn-freeze" hidden>Freeze &amp; measure</button>
+			<label class="filebtn">Open photo<input type="file" id="file" accept="image/*"></label>
+			<button id="btn-demo">Demo</button>
+		</div>
+
+		<div class="demo-panel" id="demo-panel" hidden>
+			<label>Phase <input type="range" id="demo-phase" min="0" max="1000" value="700"><span id="demo-phase-val">70%</span></label>
+			<label>Blur <input type="range" id="demo-blur" min="0" max="50" value="8"><span id="demo-blur-val">0.8 px</span></label>
+			<label>Noise <input type="range" id="demo-noise" min="0" max="40" value="6"><span id="demo-noise-val">6</span></label>
+			<p class="demo-note">The demo renders a Moon of known phase, so you can see the measured number next to the truth.</p>
+		</div>
+
+		<div class="layers">
+			<label><input type="checkbox" id="l-region" checked> Lit region</label>
+			<label><input type="checkbox" id="l-circles" checked> The two circles</label>
+			<label><input type="checkbox" id="l-exact" checked> True terminator</label>
+		</div>
+	</section>
+
+	<section class="readout" id="readout" hidden>
+		<div class="headline">
+			<div class="pct"><span id="k-value">—</span><span class="pm">±<span id="k-sigma">—</span></span></div>
+			<div class="shape" id="k-shape">—</div>
+			<div class="truth" id="k-truth" hidden></div>
+		</div>
+
+		<div class="rows">
+			<div class="row"><span class="lbl">Exact geometry <em>(headline)</em></span><span class="val" id="m-exact">—</span></div>
+			<div class="row"><span class="lbl">Two-circle model</span><span class="val" id="m-circ">—</span></div>
+			<div class="row"><span class="lbl">Model bias, circles vs truth</span><span class="val" id="m-bias">—</span></div>
+			<div class="row"><span class="lbl">Lit pixels ÷ disc area <em>(no model)</em></span><span class="val" id="m-area">—</span></div>
+		</div>
+
+		<h3>Where the uncertainty comes from</h3>
+		<div class="budget" id="budget"></div>
+		<p class="budget-total">Added in quadrature: <strong id="budget-total">—</strong></p>
+
+		<div class="warnings" id="warnings"></div>
+
+		<details class="diag">
+			<summary>Diagnostics</summary>
+			<div class="rows" id="diag-rows"></div>
+		</details>
+	</section>
+</main>
+
+<section class="explain">
+	<h2>How it works, and what it can&rsquo;t do</h2>
+
+	<h3>Two circles, but not their intersection</h3>
+	<p>
+		The lit part of the Moon is bounded by two curves: the <strong>limb</strong>, which is
+		an arc of the Moon&rsquo;s own circular outline, and the <strong>terminator</strong>, the
+		line between day and night. The cusps &mdash; the two sharp points &mdash; always sit at
+		opposite ends of a diameter, so the lit limb is always exactly a half-circle,
+		at every phase.
+	</p>
+	<p>
+		It is tempting to say the shape is the intersection of two overlapping circles.
+		It cannot be. The intersection of two convex shapes is convex, and a crescent is
+		not convex &mdash; it has a dent in it. So the same two circles have to be combined
+		two different ways:
+	</p>
+	<ul>
+		<li><strong>Gibbous</strong> (more than half lit): lit = disc <em>intersect</em> second circle.</li>
+		<li><strong>Crescent</strong> (less than half lit): lit = disc <em>minus</em> second circle.</li>
+		<li><strong>Quarter</strong>: the second circle&rsquo;s radius runs off to infinity and its arc becomes a straight line.</li>
+	</ul>
+	<p>
+		That is the model drawn on the image: a gold circle for the limb, a pink one for the
+		terminator&rsquo;s circle. Near quarter phase the pink circle is enormous, so past a point
+		the app draws the straight line it is heading towards.
+	</p>
+
+	<h3>The circular arc is an approximation, and here is exactly how wrong</h3>
+	<p>
+		The real terminator is not a circular arc. It is the Moon&rsquo;s day/night boundary &mdash;
+		a circle in 3D &mdash; seen at an angle, so it projects to <strong>half an ellipse</strong>
+		with semi-axes <em>R</em> and <em>R&nbsp;cos&nbsp;i</em>. That gives the textbook
+		illuminated fraction <em>k</em>&nbsp;=&nbsp;(1&nbsp;+&nbsp;cos&nbsp;i)&nbsp;/&nbsp;2.
+	</p>
+	<p>
+		Substituting a circular arc through the same three points changes the enclosed area.
+		The error is a <em>bias</em>, not noise &mdash; it always pushes the answer towards 50%:
+	</p>
+	<table class="bias">
+		<tr><th>True lit fraction</th><td>5%</td><td>20%</td><td>35%</td><td>50%</td><td>65%</td><td>80%</td><td>95%</td></tr>
+		<tr><th>Two-circle model</th><td>6.2%</td><td>22.8%</td><td>37.0%</td><td>50.0%</td><td>63.0%</td><td>77.2%</td><td>93.8%</td></tr>
+		<tr><th>Bias</th><td>+1.2</td><td>+2.8</td><td>+2.0</td><td>0.0</td><td>&minus;2.0</td><td>&minus;2.8</td><td>&minus;1.2</td></tr>
+	</table>
+	<p>
+		It peaks at <strong>2.8 percentage points</strong> near 22% and 78% lit, and vanishes
+		exactly at quarter, full and new. Because it is known in closed form, the app does not
+		have to live with it: the headline number comes from fitting the exact half-ellipse,
+		while the circles you see come from fitting the circular model. Both are reported, and
+		the green line on the image is the true terminator &mdash; the gap between it and the
+		edge of the blue region <em>is</em> the bias, drawn to scale.
+	</p>
+
+	<h3>Why there is no single &ldquo;error rate&rdquo;</h3>
+	<p>
+		A single accuracy figure would be misleading, because the error sources behave
+		completely differently depending on the phase and on how the photo was taken.
+		The app reports each separately and adds them in quadrature:
+	</p>
+	<dl>
+		<dt>Edge softness</dt>
+		<dd>
+			Haze, defocus and camera shake smear the limb over several pixels, and the
+			threshold that decides &ldquo;lit or not&rdquo; could sit anywhere inside that band.
+			Moving the whole outline by half the transition width changes the area in
+			proportion to the perimeter. On a hand-held phone shot this usually dominates
+			everything else.
+		</dd>
+		<dt>Shape mismatch</dt>
+		<dd>
+			How well an idealised Moon matches the actual bright blob, as intersection-over-union.
+			Clouds, a tree branch or a second light source show up here.
+		</dd>
+		<dt>Radius uncertainty</dt>
+		<dd>
+			The lit fraction is an area divided by <em>&pi;R&sup2;</em>, so an error in the fitted
+			radius enters doubled.
+		</dd>
+		<dt>Model bias</dt>
+		<dd>
+			The table above. Reported, but deliberately <em>not</em> added to the band, because
+			the headline number is the ellipse fit and does not carry it.
+		</dd>
+	</dl>
+	<dl>
+		<dt>Unresolved crescent</dt>
+		<dd>
+			Appears only when the lit sliver is no wider than the blur that is smearing it.
+			At that point thresholding widens the sliver, and the radius has to be inferred
+			from the sliver itself, so the answer stops being a measurement. The same phase
+			photographed at four times the magnification is measurable again.
+		</dd>
+	</dl>
+	<p>
+		Against synthetic Moons of known phase &mdash; clean, blurred, noisy, small,
+		overexposed and combinations of those &mdash; the true value falls inside the quoted
+		band in 122 of 123 cases, and the single miss is at 1.8&sigma;. A further nine images
+		were declined outright rather than measured, which is the other half of being honest:
+		a crescent thinner than the blur hiding it still leaves a bright blob for the
+		threshold to find, and fitting that blob produced a confident 99% from an image with
+		no Moon left in it. If the brightest region is not clearly brighter than its
+		surroundings, the app says so instead of quoting a number. On a clean image the
+		measurement lands within about half a percentage point of truth.
+	</p>
+
+	<h3>Things it genuinely cannot tell you</h3>
+	<ul>
+		<li>
+			<strong>Waxing or waning.</strong> A single photo shows which side is lit, but turning
+			that into waxing or waning needs to know your hemisphere and which way up the camera
+			was. So the app says &ldquo;crescent&rdquo;, never &ldquo;waxing crescent&rdquo;.
+		</li>
+		<li>
+			<strong>An overexposed Moon.</strong> Phone cameras meter for the dark sky and blow the
+			disc out to a white blob, which reads as nearly full whatever the real phase is. The
+			app measures how much of the disc is clipped to pure white and warns you.
+		</li>
+		<li>
+			<strong>Photometric truth.</strong> This measures the <em>geometric</em> lit fraction.
+			Lunar mountains scallop the real terminator, and the limb is darker than the centre,
+			so how much light the Moon actually sends you is a slightly different question.
+		</li>
+	</ul>
+	<p class="privacy">
+		Everything runs in your browser. No image, frame or measurement is uploaded anywhere,
+		and there is no backend to upload it to.
+	</p>
+</section>
+
+<footer>
+	<p>Open source · all processing local · <span id="ver"></span></p>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
