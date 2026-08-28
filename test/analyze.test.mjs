@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { renderMoon } from './synth.mjs';
 import { analyze, shapeName } from '../js/analyze.js';
 import { terminatorPath, limbPath } from '../js/overlay.js';
-import { compare } from '../js/fit.js';
+import { compare, errorBudget } from '../js/fit.js';
 import { isLitExact, isLitCircular } from '../js/geometry.js';
 
 const W = 340, H = 300;
@@ -74,7 +74,15 @@ test('the quoted band covers the truth across blur, noise, size and exposure', (
 		{}, { blur: 2 }, { blur: 4, noise: 12 }, { blur: 5 }, { noise: 20 }, { noise: 25 },
 		{ R: 40 }, { R: 22 }, { sky: 30, noise: 8 }, { peak: 255, blur: 2 }, { blur: 3, noise: 15 },
 	];
+	// The contract: the band is a calibrated one sigma, not a worst-case
+	// bound. Original calibration priced the threshold as landing anywhere in
+	// the smeared edge, which covered the truth in every single case with a
+	// median error of 0.03 sigma -- a bound masquerading as a standard
+	// deviation. Recalibrated (threshold near the middle of the band), the
+	// coverage should sit clearly above the Gaussian 68% but no longer at
+	// 100%, with no miss beyond twice the band.
 	let inside = 0, total = 0, refused = 0, worstRatio = 0;
+	const ratios = [];
 	for (const cond of conditions) {
 		for (const cosI of [-0.99, -0.98, -0.95, -0.9, -0.7, -0.4, -0.1, 0.2, 0.5, 0.8, 0.95, 1]) {
 			const r = shoot(cosI, cond);
@@ -82,16 +90,59 @@ test('the quoted band covers the truth across blur, noise, size and exposure', (
 			total++;
 			const err = Math.abs(r.k - (1 + cosI) / 2);
 			if (err <= r.sigma) inside++;
-			worstRatio = Math.max(worstRatio, err / Math.max(r.sigma, 1e-9));
+			const z = err / Math.max(r.sigma, 1e-9);
+			ratios.push(z);
+			worstRatio = Math.max(worstRatio, z);
 		}
 	}
+	ratios.sort((a, b) => a - b);
 	assert.ok(total > 100, `only ${total} cases ran`);
-	assert.ok(inside / total > 0.97, `only ${inside}/${total} inside the band`);
-	// Nothing should be wildly outside: a miss by more than 2 sigma means the
-	// budget is not merely tight but wrong.
-	assert.ok(worstRatio < 2, `worst miss was ${worstRatio.toFixed(2)} sigma`);
+	assert.ok(inside / total >= 0.85, `only ${inside}/${total} inside a one-sigma band`);
+	assert.ok(worstRatio <= 2.5, `worst miss was ${worstRatio.toFixed(2)} sigma`);
+	// If the median error is a tiny fraction of the band, the band is a bound
+	// again and the recalibration has regressed.
+	assert.ok(ratios[ratios.length >> 1] >= 0.05 && ratios[ratios.length >> 1] <= 0.6,
+		`median err/sigma ${ratios[ratios.length >> 1].toFixed(2)} -- band no longer reads as one sigma`);
 	// And the images with no Moon left in them must be refused, not measured.
 	assert.ok(refused > 0, 'expected the hopeless cases to be declined');
+});
+
+test('the budget covers the one real photo we have ground truth for', () => {
+	// 2026-08-28, 00:38 CEST, five and a half hours before full moon: true
+	// illumination 99.94% (Meeus), the app read 98.45%. At that resolution the
+	// dark sliver is 0.05 px -- physically unresolvable -- so the 1.5 pp error
+	// is a resolution effect, and the budget must price it. Synthetic images
+	// cannot reproduce this (their symmetric edges fit back to the truth), so
+	// the budget is exercised directly with the photo's measured numbers.
+	const R = 37.8, cosI = 0.9691;
+	const disc = Math.PI * R * R;
+	const b = errorBudget({
+		params: { cx: 0, cy: 0, R, theta: 0, cosI },
+		iou: 0.995,
+		symDiff: 2 * 0.0022 * disc,        // sigmaFit was quoted at ±0.22%
+		litArea: ((1 + cosI) / 2) * disc,
+		edgeWidth: 3.09, edgeUncertain: false,
+		limbRms: 0.95, limbCount: 212,
+	});
+	const res = b.terms.find((t) => t.key === 'res');
+	assert.ok(res, 'no resolution term for the unresolvable dark sliver');
+	assert.match(res.detail, /dark sliver/);
+	// The raw term is huge (the sliver is 6x thinner than the edge smear); the
+	// cap must pull it back to exactly the distance to full.
+	const kMeasured = (1 + cosI) / 2;
+	assert.ok(Math.abs(b.sigmaRes - (1 - kMeasured)) < 1e-9,
+		`sigmaRes ${b.sigmaRes} should be capped at ${1 - kMeasured}`);
+	// And the total band must cover the real error, without ballooning back
+	// into the old +-8% bound.
+	const realError = 0.9994 - kMeasured;
+	assert.ok(b.total >= realError, `band ${b.total} misses the real error ${realError}`);
+	assert.ok(b.total < 0.04, `band ${b.total} is a bound again, not a one-sigma`);
+});
+
+test('a soft near-full synthetic still quotes a band that covers full', () => {
+	const r = shoot(0.9988, { blur: 4, R: 38 });
+	assert.ok(r.ok);
+	assert.ok(Math.abs(r.k - 0.9994) <= r.sigma, `k ${r.k} +- ${r.sigma} misses 0.9994`);
 });
 
 test('declines images where the bright blob is only noise', () => {

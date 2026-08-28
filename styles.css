@@ -193,6 +193,7 @@ h3 { margin: 24px 0 10px; font-size: 0.95rem; letter-spacing: 0.02em; }
 .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #5aa9ea, #8cc9ff); }
 .bar-detail { font-size: 0.78rem; color: var(--dim); }
 .budget-total { font-size: 0.9rem; color: var(--dim); }
+.budget-note { font-size: 0.78rem; color: var(--dim); opacity: 0.75; margin-top: -4px; }
 
 .warnings { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 

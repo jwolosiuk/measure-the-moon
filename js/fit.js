@@ -170,13 +170,18 @@ export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUnce
 	const s = Math.abs(R * cosI);
 	const kExact = litFractionExact(cosI);
 
-	// 1. Where exactly is the edge? A soft limb means the threshold could sit
-	//    anywhere inside the transition band, moving the whole outline by up to
-	//    half its width. Scales with the perimeter, so it hurts thin crescents.
+	// 1. Where exactly is the edge? The limb is smeared over edgeWidth pixels
+	//    and the recovered outline sits wherever the threshold lands inside
+	//    that band. Otsu lands near the middle of the band, not anywhere in
+	//    it, so the displacement is priced at an eighth of the width -- the
+	//    original half-width made this term a worst-case bound masquerading as
+	//    a standard deviation (median error 0.03 sigma over 210 synthetic
+	//    Moons; a real 76 px Moon photo came in at 0.18 sigma).
+	//    Scales with the perimeter, so it hurts thin slivers.
 	const perimeter = Math.PI * R + halfEllipsePerimeter(R, s);
 	// Too few rays gave a usable edge to trust the median, so double it rather
 	// than quietly report a confident-looking number.
-	const sigmaEdge = ((perimeter * (edgeWidth / 2)) / disc) * (edgeUncertain ? 2 : 1);
+	const sigmaEdge = ((perimeter * (edgeWidth / 8)) / disc) * (edgeUncertain ? 2 : 1);
 
 	// 2. How well does an idealised Moon match the actual blob at all? Half the
 	//    symmetric difference is the area genuinely in dispute.
@@ -185,17 +190,19 @@ export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUnce
 	// 3. Radius uncertainty. k scales as 1/R², so it enters doubled.
 	const sigmaR = limbCount > 0 ? (2 * kExact * (limbRms / Math.sqrt(limbCount))) / R : 0;
 
-	// 4. Resolution. A crescent narrower than about two edge-transition widths
-	//    is not resolved at all: thresholding a sub-pixel sliver widens it, and
-	//    the radius then has to be inferred from that same sliver. Measured on
-	//    the observed blob (area over its length), not on the fitted lune --
-	//    the fitted one has already been widened by the very effect this term
-	//    is meant to price in. Crescents only: near full Moon the thin lune is
-	//    the dark one and the limb is a nearly complete circle, so R stays well
-	//    determined.
-	const luneWidth = litArea / (Math.PI * R);
+	// 4. Resolution. A sliver narrower than about two edge-transition widths is
+	//    not resolved at all: thresholding widens it, and near new the radius
+	//    has to be inferred from that same sliver. Symmetric in phase -- near
+	//    full it is the DARK sliver that vanishes, and a Moon photographed
+	//    hours from full genuinely cannot be told apart from 100% (a real
+	//    photo at true 99.9% read 98.5% for exactly this reason). Measured on
+	//    the observed areas, not the fitted lune, which has already been
+	//    widened by the very effect being priced. Capped at the distance to
+	//    empty/full: the truth cannot sit outside [0, 1].
+	const luneWidth = (cosI < 0 ? litArea : disc - litArea) / (Math.PI * R);
 	const unresolved = Math.max(0, 2 * edgeWidth - luneWidth);
-	const sigmaRes = cosI < 0 ? (perimeter * 0.5 * unresolved) / disc : 0;
+	let sigmaRes = (perimeter * 0.5 * unresolved) / disc;
+	sigmaRes = Math.min(sigmaRes, cosI < 0 ? kExact : 1 - kExact);
 
 	const total = Math.sqrt(sigmaEdge ** 2 + sigmaFit ** 2 + sigmaR ** 2 + sigmaRes ** 2);
 	return {
@@ -207,7 +214,7 @@ export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUnce
 			{ key: 'edge', label: 'Edge softness', value: sigmaEdge, detail: `limb transition ${edgeWidth.toFixed(1)} px${edgeUncertain ? ', poorly sampled (doubled)' : ''}` },
 			{ key: 'fit', label: 'Shape mismatch', value: sigmaFit, detail: `IoU ${(iou * 100).toFixed(1)}%` },
 			{ key: 'radius', label: 'Radius uncertainty', value: sigmaR, detail: `limb RMS ${limbRms.toFixed(2)} px over ${limbCount} px` },
-			...(sigmaRes > 0 ? [{ key: 'res', label: 'Unresolved crescent', value: sigmaRes, detail: `lit sliver averages ${luneWidth.toFixed(1)} px across, against a ${edgeWidth.toFixed(1)} px edge` }] : []),
+			...(sigmaRes > 0 ? [{ key: 'res', label: 'Unresolved sliver', value: sigmaRes, detail: `${cosI < 0 ? 'lit' : 'dark'} sliver averages ${luneWidth.toFixed(1)} px across, against a ${edgeWidth.toFixed(1)} px edge` }] : []),
 		],
 	};
 }

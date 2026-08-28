@@ -64,6 +64,8 @@
 		<h3>Where the uncertainty comes from</h3>
 		<div class="budget" id="budget"></div>
 		<p class="budget-total">Added in quadrature: <strong id="budget-total">—</strong></p>
+		<p class="budget-note">Calibrated as a one-sigma band: against test Moons of known phase the
+		truth landed inside it 93% of the time, and never beyond twice it.</p>
 
 		<div class="warnings" id="warnings"></div>
 
@@ -137,9 +139,11 @@
 		<dt>Edge softness</dt>
 		<dd>
 			Haze, defocus and camera shake smear the limb over several pixels, and the
-			threshold that decides &ldquo;lit or not&rdquo; could sit anywhere inside that band.
-			Moving the whole outline by half the transition width changes the area in
-			proportion to the perimeter. On a hand-held phone shot this usually dominates
+			recovered outline sits wherever the threshold lands inside that band. The
+			threshold lands near the middle of the band, not anywhere in it, so the
+			displacement is priced at an eighth of the transition width &mdash; calibrated so
+			the total band behaves like an actual one-sigma rather than a worst-case bound.
+			Scales with the perimeter, and on a hand-held phone shot it usually dominates
 			everything else.
 		</dd>
 		<dt>Shape mismatch</dt>
@@ -159,24 +163,29 @@
 		</dd>
 	</dl>
 	<dl>
-		<dt>Unresolved crescent</dt>
+		<dt>Unresolved sliver</dt>
 		<dd>
-			Appears only when the lit sliver is no wider than the blur that is smearing it.
-			At that point thresholding widens the sliver, and the radius has to be inferred
-			from the sliver itself, so the answer stops being a measurement. The same phase
-			photographed at four times the magnification is measurable again.
+			Appears when the thin sliver &mdash; lit near new, dark near full &mdash; is no wider
+			than the blur smearing it. At that point thresholding widens it and the answer
+			stops being a measurement: a Moon photographed hours from full genuinely cannot
+			be told apart from 100%, so the band widens to the distance to full. The same
+			phase photographed at four times the magnification is measurable again.
 		</dd>
 	</dl>
 	<p>
-		Against synthetic Moons of known phase &mdash; clean, blurred, noisy, small,
-		overexposed and combinations of those &mdash; the true value falls inside the quoted
-		band in 122 of 123 cases, and the single miss is at 1.8&sigma;. A further nine images
-		were declined outright rather than measured, which is the other half of being honest:
-		a crescent thinner than the blur hiding it still leaves a bright blob for the
-		threshold to find, and fitting that blob produced a confident 99% from an image with
-		no Moon left in it. If the brightest region is not clearly brighter than its
-		surroundings, the app says so instead of quoting a number. On a clean image the
-		measurement lands within about half a percentage point of truth.
+		The band is calibrated as a true one-sigma, not a guarantee. Against synthetic Moons
+		of known phase &mdash; clean, blurred, noisy, small, overexposed and combinations of
+		those &mdash; the truth lands inside the band in 114 of 123 cases (93%), with a median
+		error of 0.17&sigma; and nothing beyond 2&sigma;. It has one real-world calibration
+		point too: a hand-held photo taken five and a half hours before the August 2026 full
+		moon, at a true illumination of 99.94%, measured 98.45% &mdash; an error of 1.5 points
+		against a quoted &plusmn;2.6, or 0.6&sigma;. A further nine synthetic images were
+		declined outright rather than measured, which is the other half of being honest: a
+		crescent thinner than the blur hiding it still leaves a bright blob for the threshold
+		to find, and fitting that blob produced a confident 99% from an image with no Moon
+		left in it. If the brightest region is not clearly brighter than its surroundings,
+		the app says so instead of quoting a number. On a clean image the measurement lands
+		within about half a percentage point of truth.
 	</p>
 
 	<h3>Things it genuinely cannot tell you</h3>

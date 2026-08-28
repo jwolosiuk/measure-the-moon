@@ -47,18 +47,25 @@ line and the blue region on screen is the bias at true scale.
 The error sources behave differently with phase and with how the photo was
 taken, so they are reported separately and added in quadrature:
 
-- **Edge softness** — haze, defocus and shake smear the limb, and the threshold
-  could sit anywhere in that band. Scales with the perimeter. Usually dominant.
+- **Edge softness** — haze, defocus and shake smear the limb over several
+  pixels. Otsu lands near the middle of that band, so the displacement is
+  priced at an eighth of the transition width — calibrated so the band behaves
+  like an actual one-sigma, not a worst-case bound. Usually dominant.
 - **Shape mismatch** — how well an idealised Moon matches the blob (IoU).
 - **Radius uncertainty** — `k` is an area over `πR²`, so an error in `R` enters
   doubled.
-- **Unresolved crescent** — fires only when the lit sliver is no wider than the
-  blur smearing it.
+- **Unresolved sliver** — fires when the thin sliver (lit near new, dark near
+  full) is no wider than the blur smearing it; capped at the distance to
+  empty/full. Near full this is what stops a soft photo from being reported
+  as certain.
 - **Model bias** — the table above. Reported but not summed in, since the
   headline number is the ellipse fit and does not carry it.
 
-Against synthetic Moons of known phase the truth is inside the quoted band in
-**122 of 123** cases, worst miss 1.8σ. Nine further images were **declined**
+The band is calibrated as a true one-sigma: against synthetic Moons of known
+phase the truth lands inside it in **114 of 123** cases (93%), median error
+0.17σ, nothing beyond 2σ. One real-world point too: a photo taken 5½ hours
+before the August 2026 full moon (true illumination 99.94%) measured 98.45% —
+0.6σ against the quoted band. Nine further images were **declined**
 rather than measured: a crescent thinner than the blur hiding it still leaves a
 blob for Otsu to find, and fitting it produced a confident 99% from an image
 with no Moon in it, so the analyser now refuses when the bright region is not
