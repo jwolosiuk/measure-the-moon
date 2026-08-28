@@ -41,19 +41,6 @@ export function circularModelBias(cosI) {
 	return litFractionCircular(cosI) - litFractionExact(cosI);
 }
 
-// Invert litFractionCircular: which cosI would a circular-model fit have to
-// have to report this lit fraction? Monotone in cosI, so bisection is enough.
-export function cosIFromCircularFraction(k) {
-	if (k <= 0) return -1;
-	if (k >= 1) return 1;
-	let lo = -1, hi = 1;
-	for (let i = 0; i < 60; i++) {
-		const mid = (lo + hi) / 2;
-		if (litFractionCircular(mid) < k) lo = mid; else hi = mid;
-	}
-	return (lo + hi) / 2;
-}
-
 // The second circle: the one whose arc runs through both cusps and the
 // terminator apex. Returned offset `t` is measured from the disc centre along
 // u. `mode` says how to combine it with the disc to get the lit region --

@@ -164,7 +164,7 @@ function halfEllipsePerimeter(a, b) {
 
 // The error budget. Deliberately not one number: the terms behave completely
 // differently with phase and with how the photo was taken.
-export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUncertain, limbRms, limbCount, clipped }) {
+export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUncertain, limbRms, limbCount }) {
 	const { R, cosI } = params;
 	const disc = Math.PI * R * R;
 	const s = Math.abs(R * cosI);
@@ -212,7 +212,7 @@ export function errorBudget({ params, iou, symDiff, litArea, edgeWidth, edgeUnce
 	};
 }
 
-export function warnings({ params, iou, R, clipped, edgeWidth, edgeUncertain, touchesBorder, litArea }) {
+export function warnings({ params, iou, R, clipped, edgeWidth, touchesBorder }) {
 	const out = [];
 	const width = R * (1 - Math.abs(params.cosI)); // thickness of the thinner lune
 	if (R < 20) out.push({ level: 'bad', text: `The Moon is only ${(2 * R).toFixed(0)} px across. Zoom in or move closer to the screen; below ~40 px the shape carries very little phase information.` });

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { renderMoon } from './synth.mjs';
 import { analyze, shapeName } from '../js/analyze.js';
 import { terminatorPath, limbPath } from '../js/overlay.js';
+import { compare } from '../js/fit.js';
+import { isLitExact, isLitCircular } from '../js/geometry.js';
 
 const W = 340, H = 300;
 const base = { cx: 168.4, cy: 151.7, R: 90, theta: 0.62 };
@@ -232,4 +234,33 @@ test('near quarter phase the second circle is reported as a straight line', () =
 	const r = shoot(0.005);
 	assert.equal(r.circles.shadow, null);
 	assert.ok(r.circles.straight, 'expected the limiting line');
+});
+
+test('the fitter and the geometry module agree on what is lit', () => {
+	// compare() inlines the membership test rather than calling into
+	// geometry.js, for speed -- it runs per pixel, per optimiser step. That is
+	// a place where the two could silently drift apart, with the maths tests
+	// still passing while the fit uses something else, so pin them together.
+	const w = 61, h = 61;
+	const params = { cx: 30.3, cy: 29.6, R: 24, theta: 0.9, cosI: 0 };
+	for (const variant of ['exact', 'circular']) {
+		const predicate = variant === 'exact' ? isLitExact : isLitCircular;
+		for (const cosI of [-0.95, -0.6, -0.2, 0, 0.2, 0.6, 0.95]) {
+			const p = { ...params, cosI };
+			const u = [Math.cos(p.theta), Math.sin(p.theta)];
+			// Build the mask geometry.js says is lit...
+			const mask = new Uint8Array(w * h);
+			let area = 0;
+			for (let y = 0; y < h; y++) {
+				for (let x = 0; x < w; x++) {
+					if (predicate(x, y, p.cx, p.cy, p.R, u, cosI)) { mask[y * w + x] = 1; area++; }
+				}
+			}
+			// ...and ask the fitter to score its own model against it.
+			const c = compare(p, variant, mask, w, h, area, [0, 0, w - 1, h - 1]);
+			assert.equal(c.symDiff, 0,
+				`${variant} at cosI=${cosI}: fitter and geometry disagree on ${c.symDiff} px`);
+			assert.equal(c.iou, 1);
+		}
+	}
 });

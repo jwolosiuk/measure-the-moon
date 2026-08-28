@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	litFractionExact, litFractionCircular, circularModelBias, arcBulgeArea,
-	shadowCircle, isLitCircular, isLitExact, cosIFromCircularFraction, litCentroidOffset,
+	shadowCircle, isLitCircular, isLitExact, litCentroidOffset,
 } from '../js/geometry.js';
 
 const U = [Math.cos(0.7), Math.sin(0.7)];
@@ -73,12 +73,6 @@ test('the published bias table is what the code computes', () => {
 		const cosI = 2 * kTrue - 1;
 		assert.ok(Math.abs(litFractionCircular(cosI) - kCirc) < 5e-4,
 			`k=${kTrue}: got ${litFractionCircular(cosI)}, table says ${kCirc}`);
-	}
-});
-
-test('circular fraction inverts', () => {
-	for (const cosI of [-0.93, -0.4, 0, 0.4, 0.93]) {
-		assert.ok(Math.abs(cosIFromCircularFraction(litFractionCircular(cosI)) - cosI) < 1e-6);
 	}
 });
 

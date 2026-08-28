@@ -1,4 +1,4 @@
-import { litCentroidOffset } from './geometry.js';
+import { litCentroidOffset, shadowCircle } from './geometry.js';
 // Turning a photo into a binary "this pixel is lit Moon" mask, plus the
 // measurements the error budget needs (edge softness, clipping, limb residual).
 
@@ -263,14 +263,28 @@ export function clippedFraction(lum, mask) {
 	return lit ? clipped / lit : 0;
 }
 
-// RMS radial residual of the boundary points that lie on the lit limb, i.e.
-// those roughly a radius away from the centre. Feeds the uncertainty on R.
-export function limbResidual(boundary, cx, cy, R) {
+// RMS radial residual of the boundary points that lie on the lit limb. Feeds
+// the uncertainty on R.
+//
+// Being near the fitted radius is not enough to be a limb point: a good part of
+// the terminator also runs close to it, and counting those inflates the figure
+// with a deviation that is not limb noise at all. So each candidate is assigned
+// to whichever of the two curves it is actually closer to.
+export function limbResidual(boundary, params) {
+	const { cx, cy, R, theta, cosI } = params;
+	const ux = Math.cos(theta), uy = Math.sin(theta);
+	const sc = shadowCircle(R, cosI);
+	const sx = cx + (sc.straight ? 0 : sc.t * ux);
+	const sy = cy + (sc.straight ? 0 : sc.t * uy);
 	let n = 0, sum = 0;
 	for (const [x, y] of boundary) {
-		const d = Math.hypot(x - cx, y - cy);
-		if (Math.abs(d - R) > 0.25 * R) continue;
-		sum += (d - R) * (d - R);
+		const dLimb = Math.hypot(x - cx, y - cy) - R;
+		if (Math.abs(dLimb) > 0.25 * R) continue;
+		const dTerm = sc.straight
+			? Math.abs((x - cx) * ux + (y - cy) * uy)
+			: Math.abs(Math.hypot(x - sx, y - sy) - sc.rho);
+		if (Math.abs(dLimb) > dTerm) continue; // belongs to the terminator
+		sum += dLimb * dLimb;
 		n++;
 	}
 	return { rms: n ? Math.sqrt(sum / n) : 0, count: n };

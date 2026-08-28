@@ -50,13 +50,13 @@ export function analyze(rgba, w, h, { maxEvals = 400 } = {}) {
 	const p = exact.params;
 	const disc = Math.PI * p.R * p.R;
 	const edge = V.limbEdgeWidth(lum, w, h, p.cx, p.cy, p.R, p.theta);
-	const limb = V.limbResidual(boundary, p.cx, p.cy, p.R);
+	const limb = V.limbResidual(boundary, p);
 	const clipped = V.clippedFraction(lum, seg.mask);
 
 	const budget = errorBudget({
 		params: p, iou: exact.iou, symDiff: exact.symDiff, litArea: seg.area,
 		edgeWidth: edge.width, edgeUncertain: edge.uncertain,
-		limbRms: limb.rms, limbCount: limb.count, clipped,
+		limbRms: limb.rms, limbCount: limb.count,
 	});
 
 	const k = litFractionExact(p.cosI);
@@ -80,10 +80,9 @@ export function analyze(rgba, w, h, { maxEvals = 400 } = {}) {
 		edgeWidth: edge.width,
 		edgeUncertain: edge.uncertain,
 		clipped,
-		mask: seg.mask,
 		warnings: warnings({
-			params: p, iou: exact.iou, R: p.R, clipped, edgeWidth: edge.width,
-			edgeUncertain: edge.uncertain, touchesBorder: seg.touchesBorder, litArea: seg.area,
+			params: p, iou: exact.iou, R: p.R, clipped,
+			edgeWidth: edge.width, touchesBorder: seg.touchesBorder,
 		}),
 	};
 }
