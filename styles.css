@@ -14,6 +14,13 @@
 
 * { box-sizing: border-box; }
 
+/* The hidden attribute must always win. Without this, any element that both
+   toggles `hidden` and has an author display rule (.demo-panel is display:flex)
+   can never be hidden again once shown: author declarations beat the UA's
+   [hidden] { display: none } in the cascade, so the demo panel stayed painted
+   over photo measurements while the JS believed it was closed. */
+[hidden] { display: none !important; }
+
 body {
 	margin: 0;
 	background: radial-gradient(1200px 700px at 70% -10%, #16203a 0%, var(--bg) 60%);

@@ -12,6 +12,11 @@ await import('../js/app.js');
 assert.equal($('ver').textContent, 'v1.0', 'version should be stamped on load');
 assert.ok($('readout').hidden, 'no readout before anything is measured');
 
+// Rendered visibility, not the hidden property: the property was always
+// toggling correctly while CSS display:flex kept the panel painted anyway.
+const painted = (el) => dom.window.getComputedStyle(el).display !== 'none';
+assert.ok(!painted($('demo-panel')), 'demo panel painted before Demo was ever pressed');
+
 const pct = (s) => Number(String(s).replace('%', ''));
 
 // --- run the demo at a known phase -------------------------------------------
@@ -19,7 +24,7 @@ $('demo-phase').value = '700';
 $('btn-demo').dispatchEvent(new dom.window.Event('click'));
 
 assert.ok(!$('readout').hidden, 'readout should appear');
-assert.ok(!$('demo-panel').hidden, 'demo controls should appear');
+assert.ok(painted($('demo-panel')), 'demo controls should appear');
 
 const measured = pct($('k-value').textContent);
 assert.ok(Math.abs(measured - 70) < 3, `demo at 70% measured ${measured}%`);
@@ -87,6 +92,7 @@ assert.equal($('k-value').textContent, before, 'toggling layers must not change 
 $('btn-cam').dispatchEvent(new dom.window.Event('click'));
 await new Promise((r) => setTimeout(r, 50));
 assert.ok(/camera|photo/i.test($('warnings').textContent), 'should explain the missing camera');
+assert.ok(!painted($('demo-panel')), 'leaving the demo must actually unpaint the panel');
 
 
 

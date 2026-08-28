@@ -78,6 +78,16 @@ export function boot(htmlPath) {
 	const dom = new JSDOM(fs.readFileSync(htmlPath, 'utf8'), { pretendToBeVisual: true });
 	const { window } = dom;
 
+	// jsdom does not fetch the external stylesheet, so visibility bugs where
+	// CSS overrides the hidden attribute are invisible to it. Inline the real
+	// stylesheet so getComputedStyle answers for the page as actually served.
+	const cssPath = new URL('styles.css', 'file://' + htmlPath).pathname;
+	if (fs.existsSync(cssPath)) {
+		const style = window.document.createElement('style');
+		style.textContent = fs.readFileSync(cssPath, 'utf8');
+		window.document.head.appendChild(style);
+	}
+
 	window.HTMLCanvasElement.prototype.getContext = function () {
 		if (!this.__ctx) this.__ctx = makeContext(this);
 		return this.__ctx;
